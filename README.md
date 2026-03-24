@@ -2,7 +2,7 @@
 
 A fast, searchable portal for regulatory guidance documents from the **FDA**, **Health Canada**, **EMA**, **ICH**, and **WHO**. Built as a single-file web app — no server, no dependencies, no build step required.
 
-**Live demo:** *(deploy to GitHub Pages and add your link here)*
+**Live demo:** *https://osmanmahad.github.io/RegSearch/*
 
 ---
 
