@@ -1945,14 +1945,14 @@ Only include these agencies: ${ags.join(", ")}.
 Return ONLY a JSON object — no markdown, no explanation, nothing else.
 Format: {"FDA":[...],"HC":[...],"EMA":[...],"ICH":[...],"WHO":[...]}
 Each item: {"agency":"FDA","title":"exact title","type":"Guidance or Guideline","topic":"short topic","date":"YYYY-MM","pdf_filename":"file.pdf or null","pdf_url":"https://...pdf or null","page_url":"https://official url"}
-Rules: 3-6 real docs per agency, only include agencies with results, real URLs only, no invented documents.`;
+Rules: max 3 docs per agency, only agencies with results, real URLs only, no invented docs.`;
 
         fetch(PROXY_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             model: "claude-sonnet-4-20250514",
-            max_tokens: 2048,
+            max_tokens: 4096,
             system: sp,
             messages: [
               {
@@ -1967,18 +1967,65 @@ Rules: 3-6 real docs per agency, only include agencies with results, real URLs o
             return r.json();
           })
           .then((data) => {
-            // collect all text blocks
             const txt = (data.content || [])
               .filter((b) => b.type === "text")
               .map((b) => b.text)
               .join("\n");
             if (!txt.trim()) throw new Error("empty response");
-            // extract JSON
-            let s = txt.indexOf("{"),
-              e = txt.lastIndexOf("}");
-            if (s < 0 || e < 0) throw new Error("no json");
-            let jsonStr = txt.slice(s, e + 1).replace(/,\s*([}\]])/g, "$1");
-            const ai = JSON.parse(jsonStr);
+            let s = txt.indexOf("{");
+            if (s < 0) throw new Error("no json");
+            let jsonStr = txt.slice(s).replace(/,\s*([}\]])/g, "$1");
+            // close any unclosed arrays/objects if truncated
+            let open = 0;
+            for (const c of jsonStr) {
+              if (c === "{") open++;
+              else if (c === "}") open--;
+            }
+            while (open-- > 0) jsonStr += "]}";
+            // also close unclosed arrays
+            let arrOpen = 0;
+            for (const c of jsonStr) {
+              if (c === "[") arrOpen++;
+              else if (c === "]") arrOpen--;
+            }
+            while (arrOpen-- > 0) jsonStr += "]";
+            let ai;
+            try {
+              ai = JSON.parse(jsonStr);
+            } catch (e) {
+              // last resort: extract each agency array individually
+              ai = {};
+              ["FDA", "HC", "EMA", "ICH", "WHO"].forEach((ag) => {
+                try {
+                  const i = jsonStr.indexOf('"' + ag + '"');
+                  if (i < 0) return;
+                  const ab = jsonStr.indexOf("[", i);
+                  if (ab < 0) return;
+                  let depth = 0,
+                    start = -1,
+                    objs = [];
+                  for (let j = ab; j < jsonStr.length; j++) {
+                    const c = jsonStr[j];
+                    if (c === "{") {
+                      depth++;
+                      if (depth === 1) start = j;
+                    }
+                    if (c === "}") {
+                      depth--;
+                      if (depth === 0 && start >= 0) {
+                        try {
+                          objs.push(JSON.parse(jsonStr.slice(start, j + 1)));
+                        } catch {}
+                        start = -1;
+                      }
+                    }
+                    if (c === "]" && depth === 0) break;
+                  }
+                  if (objs.length) ai[ag] = objs;
+                } catch {}
+              });
+              if (!Object.keys(ai).length) throw new Error("parse failed");
+            }
 
             // merge — deduplicate by title
             const seen = new Set(
