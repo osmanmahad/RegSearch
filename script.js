@@ -1,3 +1,4 @@
+document.addEventListener('DOMContentLoaded', function() {
 
 const LOCAL=[
   {agency:"FDA",title:"Drug Master Files (DMFs) — Guidance for Industry",type:"Guidance",topic:"Drug Development",date:"2023-11",pdf_filename:"drug-master-file-guidances.pdf",pdf_url:"https://www.fda.gov/media/73966/download",page_url:"https://www.fda.gov/drugs/drug-master-files-dmfs/drug-master-file-guidances",kw:["drug master file","dmf","api","drug substance"]},
@@ -613,3 +614,5 @@ function toggleDark(){
   localStorage.setItem('regsearch-dark', document.body.classList.contains('dark') ? '1' : '0');
 }
 if(localStorage.getItem('regsearch-dark')==='1') document.body.classList.add('dark');
+
+});
